@@ -27,29 +27,30 @@ class Knob (var min : Double,
     super.paintComponent (g)
     g.setRenderingHint (RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
 
-    val insets = 4
+    val insets = 0
     val w = size.width - insets * 2
     val h = size.height - insets * 2
     val cx = w / 2 + insets
     val cy = h / 2 + insets
     val mr = Math.min (w / 2, h / 2)
+    val knob_color = background.darker ().darker ().darker ().darker ()
+    //    val ring_color = background.darker ()
 
-    def vx (r : Double, v : Double) = (cx + r * mr * Math.cos (to_angle (v))).toInt
-    def vy (r : Double, v : Double) = (cy - r * mr * Math.sin (to_angle (v))).toInt
-    def draw_marker (r : Double, v : Double) = g.drawLine (cx, cy, vx (r, v), vy (r, v))
+    def vx (r : Double, v : Double) = (cx + r * Math.cos (to_angle (v))).toInt
+    def vy (r : Double, v : Double) = (cy - r * Math.sin (to_angle (v))).toInt
+    def draw_marker (r1 : Double, r2 : Double, v : Double) = g.drawLine (vx (r1, v), vy (r1, v), vx (r2, v), vy (r2, v))
 
-    val or = mr * 7 / 8
-    val ox = cx - or
-    val oy = cy - or
-    val os = 2 * or
+    val or = mr * 3 / 4
+    val ox = cx - mr
+    val oy = cy - mr
+    val os = 2 * mr
 
     //val c = new Color(10, 20, 30)
     //  g setColor background.darker().darker()
-    val c = background.darker ()
-    g setColor c
-    g.fillArc (ox, oy, os, os, (end_angle * 180 / Math.PI).toInt, ((start_angle - end_angle) * 180 / Math.PI).toInt)
-    g.setColor (new Color (c.getRed, c.getGreen, Math.min (255, c.getBlue * 2)))
-    g.fillArc (ox, oy, os, os, (to_angle (value) * 180 / Math.PI).toInt, ((start_angle - to_angle (value)) * 180 / Math.PI).toInt)
+    //    g setColor ring_color
+    //  g.fillArc (ox, oy, os, os, (end_angle * 180 / Math.PI).toInt, ((start_angle - end_angle) * 180 / Math.PI).toInt)*/
+    //  g.setColor (ring_color) //new Color (background.getRed / 2, background.getGreen / 2, 255))
+    // g.fillArc (ox, oy, os, os, (to_angle (value) * 180 / Math.PI).toInt, ((start_angle - to_angle (value)) * 180 / Math.PI).toInt)
     //    g.fillArc (ox, oy, os, os, (to_angle (value) * 180 / Math.PI).toInt, ((start_angle - to_angle (value)) * 180 / Math.PI).toInt)
 
     /*    g setColor foreground.darker().darker()
@@ -57,10 +58,15 @@ class Knob (var min : Double,
         draw_marker (1, min)
         draw_marker (1, max)
     */
-    g setStroke new BasicStroke (4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_MITER)
     g setColor foreground
-    g.fillOval (cx - mr / 4, cy - mr / 4, mr / 2, mr / 2)
-    draw_marker (1, value)
+    draw_marker (mr, 0, min)
+    draw_marker (mr, 0, max)
+
+    g setColor knob_color
+    g.fillOval (cx - or, cy - or, or * 2, or * 2)
+    g setStroke new BasicStroke (3, BasicStroke.CAP_ROUND, BasicStroke.JOIN_MITER)
+    g setColor Color.WHITE
+    draw_marker (or, or * 0.3, value)
   }
 
   def set_value (v : Double) = {

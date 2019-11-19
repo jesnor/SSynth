@@ -4,6 +4,7 @@ package object math {
   def interpolate (f : Double, a : Double, b : Double) = (1 - f) * a + f * b
   def sinc (f : Double) = if (f == 0) 1.0 else Math.sin (f) / f
   def sinc_normalized (f : Double) = sinc (Math.PI * f)
+  val sqrt_2_recip = 1.0 / Math.sqrt (2)
 
   /**
    * sinc_normalized(sinc_normalized_cutoff) = 1 / sqrt(2)

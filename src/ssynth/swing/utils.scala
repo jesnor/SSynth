@@ -4,12 +4,10 @@ import java.awt.{Color, Toolkit}
 
 import javax.swing.UIManager
 import javax.swing.border.{CompoundBorder, EmptyBorder, LineBorder, MatteBorder}
-import javax.swing.text.html.StyleSheet.BoxPainter
-import ssynth.Main.harmonic_count
 import ssynth.math.Point_2i
 
 import scala.swing.event.{ButtonClicked, ValueChanged}
-import scala.swing.{Action, Alignment, BorderPanel, BoxPanel, Button, CheckBox, Component, Dimension, FlowPanel, GridBagPanel, Insets, Label, MainFrame, Orientation, Panel, Point, Slider, ToggleButton}
+import scala.swing.{Action, Alignment, BorderPanel, BoxPanel, Button, CheckBox, Component, Dimension, FlowPanel, Graphics2D, GridBagPanel, Label, MainFrame, Orientation, Point, Slider, ToggleButton}
 
 object utils {
   val title_border = new CompoundBorder (new MatteBorder (0, 0, 1, 0, Color.BLACK), new EmptyBorder (2, 4, 2, 4))
@@ -157,5 +155,10 @@ object utils {
         p.layout (knob).gridwidth = 2
       */
     p
+  }
+
+  def draw_string (g : Graphics2D, text : String, x : Double, y : Double, anchor_x : Double = 0, anchor_y : Double = 0) = {
+    val b = g.getFontMetrics.getStringBounds (text, g)
+    g.drawString (text, (x - anchor_x * b.getWidth).toInt, (y + g.getFontMetrics.getAscent - anchor_y * b.getHeight).toInt)
   }
 }
