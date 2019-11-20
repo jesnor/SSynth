@@ -1,6 +1,6 @@
 package ssynth.swing
 
-import java.awt.event.{MouseEvent, MouseListener, MouseMotionListener}
+import java.awt.event.{InputEvent, MouseEvent, MouseListener, MouseMotionListener}
 import java.awt.{BasicStroke, Color, Point, RenderingHints}
 
 import scala.swing.{Dimension, Graphics2D, Panel}
@@ -75,7 +75,7 @@ class Knob (var min : Double,
     repaint ()
   }
 
-  private var start : Option [(Point, Double)] = None
+  private var start : Option [(Point, Double, Int)] = None
 
   override def mouseEntered (e : MouseEvent) = {}
   override def mouseExited (e : MouseEvent) = {}
@@ -87,28 +87,30 @@ class Knob (var min : Double,
   override def mousePressed (e : MouseEvent) = {
     if (enabled)
       e.getButton match {
-        case MouseEvent.BUTTON1 =>
-          start = Some (e.getPoint, value)
+        case MouseEvent.BUTTON1 | MouseEvent.BUTTON3 =>
+          start = Some (e.getPoint, value, e.getButton)
 
         // Abort and reset on right click
-        case MouseEvent.BUTTON3 if enabled =>
-          for ((_, v) <- start) {
-            set_value (v)
-            start = None
-          }
-
+        /*        case MouseEvent.BUTTON3 if enabled =>
+                  for ((_, v) <- start) {
+                    set_value (v)
+                    start = None
+                  }
+        */
         case _ =>
       }
   }
 
   override def mouseReleased (e : MouseEvent) =
-    if (e.getButton == MouseEvent.BUTTON1) start = None
+    if (e.getButton == MouseEvent.BUTTON1 || e.getButton == MouseEvent.BUTTON3) start = None
 
   override def mouseDragged (e : MouseEvent) =
-    for ((p, v) <- start) {
+    for ((p, v, b) <- start) {
       if (enabled) {
         val delta = e.getPoint.x - p.x + p.y - e.getPoint.y
-        set_value (to_value (to_gui (v) + delta / 200.0))
+        val div = if ((e.getModifiers & InputEvent.SHIFT_MASK) != 0 || b == MouseEvent.BUTTON3) 800.0 else 200.0
+        set_value (to_value (to_gui (v) + delta / div))
+        start = Some ((e.getPoint, value, b))
         action (value)
         repaint ()
       }

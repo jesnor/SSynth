@@ -12,7 +12,7 @@ object utils {
 
     // Obtain and open the line.
     val line = AudioSystem.getLine (info).asInstanceOf [SourceDataLine]
-    line open (format, 30000)
+    line open (format, 8192)
     line
   }
 }
