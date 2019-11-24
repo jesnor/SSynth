@@ -83,6 +83,7 @@ object Main extends SimpleSwingApplication {
   val graph_thick_stroke = new BasicStroke (2)
 
   val info_label = new Label
+
   val spectrum_panel = new Panel {
     val db_range = 100
     val bar_stroke = new BasicStroke (3, BasicStroke.CAP_ROUND, BasicStroke.JOIN_MITER)
@@ -212,6 +213,7 @@ object Main extends SimpleSwingApplication {
       }
     }
   }
+
   val keyboard_panel = new Panel {
     background = Color.WHITE
     preferredSize = new Dimension (Int.MaxValue, 70)
@@ -228,7 +230,7 @@ object Main extends SimpleSwingApplication {
       var note = 0
       var i = 0
 
-      while (note <= 128) {
+      while (note <= 129) {
         val x = start_x + i * key_width
 
         if (notes_playing.get (note).isDefined) {
@@ -245,7 +247,7 @@ object Main extends SimpleSwingApplication {
       note = 0
       i = 0
 
-      while (note < 128) {
+      while (note < 127) {
         note += 1
 
         if (has_black (i)) {
