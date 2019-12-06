@@ -1,3 +1,3 @@
 # SSynth
 Experimental additive software synthesizer with Swing GUI. Using FFT for real-time harmonic synthesis.
-![](/screen.png?raw=true)
+![](https://github.com/jesnor/SSynth/blob/master/screen.PNG)
