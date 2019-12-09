@@ -7,7 +7,8 @@ import javax.sound.midi.{MidiMessage, Receiver}
 import javax.swing.filechooser.FileNameExtensionFilter
 import javax.swing.{SwingUtilities, Timer}
 import org.jtransforms.fft.FloatFFT_1D
-import ssynth.swing.utils.{check_box, knob_with_labels, _}
+import scala_utils.swing.utils.{check_box, knob_with_labels, _}
+import scala_utils.math
 import ssynth.util.utils.Array_float
 
 import scala.collection.mutable
@@ -47,7 +48,7 @@ object Main extends SimpleSwingApplication {
   var butterworth_enabled = true
   var butterworth_relative_freq = 0.0
   var butterworth_order = 2.0
-  var butterworth_q = math.sqrt_2_recip
+  var butterworth_q = scala_utils.math.sqrt_2_recip
   var butterworth_cutoff = calc_butterworth_cutoff
 
   var sinc_filter_enabled = false
