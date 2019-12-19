@@ -40,8 +40,11 @@ object Main extends SimpleSwingApplication {
   var osc_harmonics_divider : Int = 0
   var osc_cos_freq = 0.0
 
-  var unison_count = 1
-  var unison_spread = 1.0
+  var unison_enabled = false
+  var unison_gain = 0.5
+  var unison_slope = 0.3
+  var unison_count = 2
+  var unison_range = 0.01
 
   var filter_freq = harmonic_count (tone).toDouble
 
@@ -56,9 +59,10 @@ object Main extends SimpleSwingApplication {
   var sinc_filter_order = 100.0
   var sinc_filter_cutoff = calc_sinc_filter_cutoff
 
-  var resonator_enabled = false
-  var resonator_relative_freq = 0.0
-  var resonator_gain = 1.0
+  var notch_enabled = false
+  var notch_relative_freq = 0.0
+  var notch_gain = 1.0
+
   var osc_cos_exp = 1.0
   var resonator_width = 0.03
   val spectrum = new Array_float (frame_size)
@@ -67,11 +71,17 @@ object Main extends SimpleSwingApplication {
 
   var spectrum_time = 0L
   var fft_time = 0L
-  val notes_playing = new mutable.HashMap [Int, Synth#Voice]
+  val notes_playing = new mutable.HashMap [Int, Seq [Synth#Voice]]
   val note_keys = "zsxdcvgbhnjmq2w3er5t6y7ui9o0p"
   var keys_playing = new mutable.HashMap [Char, Int]
-  val synth = new Synth (generate_samples (_))
+  val samples_cache = new mutable.HashMap [Int, Array_float]
 
+  def get_samples (f : Double, save : Boolean = false) = {
+    val hc = harmonic_count (f).min (max_harmonic_count)
+    samples_cache.getOrElse (hc, generate_samples (hc, save))
+  }
+
+  val synth = new Synth (get_samples (_))
 
   var clip_amount = 0
   val graph_inset = 10
@@ -354,6 +364,34 @@ object Main extends SimpleSwingApplication {
             })
           )),*/
 
+          titled_panel (
+            check_box ("Unison", unison_enabled, s => {
+              unison_enabled = s
+              update_synth ()
+            }),
+
+            flow_panel (
+              knob_with_labels ("Gain", 1, 200, unison_gain * 100, v => {
+                unison_gain = v / 100.0
+                update_synth ()
+              }),
+
+              knob_with_labels ("Slope", 0, 100, unison_slope * 100, v => {
+                unison_slope = v / 100.0
+                update_synth ()
+              }),
+
+              knob_with_labels ("Count", 0, 16, unison_count, v => {
+                unison_count = v.round.toInt
+                update_synth ()
+              }),
+
+              knob_with_labels ("Range", 0, 100, unison_range * 1000.0, v => {
+                unison_range = v / 1000.0
+                update_synth ()
+              })
+            )),
+
           titled_panel ("Filter", flow_panel (
             knob_with_labels ("Freq", 1, filter_freq * 2, filter_freq, v => {
               filter_freq = v
@@ -418,14 +456,14 @@ object Main extends SimpleSwingApplication {
           },
 
           {
-            val resonator_panel = flow_panel (
-              knob_with_labels ("Freq", -1000, 1000, resonator_relative_freq * 100, v => {
-                resonator_relative_freq = v / 100
+            val notch_panel = flow_panel (
+              knob_with_labels ("Freq", -1000, 1000, notch_relative_freq * 100, v => {
+                notch_relative_freq = v / 100
                 update_synth ()
               }),
 
-              knob_with_labels ("Gain", 0, 20, resonator_gain, v => {
-                resonator_gain = v
+              knob_with_labels ("Gain", -20, 20, notch_gain, v => {
+                notch_gain = v
                 update_synth ()
               }, 2),
 
@@ -436,13 +474,13 @@ object Main extends SimpleSwingApplication {
             )
 
             titled_panel (
-              check_box ("Resonator", resonator_enabled, s => {
-                resonator_panel.enabled = s
-                resonator_enabled = s
+              check_box ("Notch", notch_enabled, s => {
+                notch_panel.enabled = s
+                notch_enabled = s
                 update_synth ()
               }),
 
-              resonator_panel
+              notch_panel
             )
           }
         ), BorderPanel.Position.West)
@@ -473,11 +511,12 @@ object Main extends SimpleSwingApplication {
     val freq = filter_freq * Math.pow (2, butterworth_relative_freq) / butterworth_cutoff
     butterworth_lpf_gain (f / freq)
   }
+
   def calc_resonator_gain (f : Double) = {
-    val freq = filter_freq * Math.pow (2, resonator_relative_freq)
+    val freq = filter_freq * Math.pow (2, notch_relative_freq)
     val r = Math.log (f / freq)
     val r2 = r * r
-    val s = resonator_gain * ((resonator_width - r2) / (r2 + resonator_width) + 1) + 1
+    val s = notch_gain * ((resonator_width - r2) / (r2 + resonator_width) + 1) + 1
     s
   }
 
@@ -502,11 +541,11 @@ object Main extends SimpleSwingApplication {
   def filter_gain (f : Double) = {
     val lf = if (butterworth_enabled) state_variable_lpf_gain (f) else 1.0
     val sf = if (sinc_filter_enabled) sinc_filter_gain (f) else 1.0
-    val rf = if (resonator_enabled) calc_resonator_gain (f) else 1.0
+    val rf = if (notch_enabled) calc_resonator_gain (f) else 1.0
     lf * sf * rf
   }
 
-  def time (f : => Unit) = {
+  def measure_time (f : => Unit) = {
     val t = System.nanoTime ()
     f
     System.nanoTime () - t
@@ -519,15 +558,17 @@ object Main extends SimpleSwingApplication {
 
     false
   }
+
   def update_synth () : Unit = {
-    generate_samples (tone, true)
+    samples_cache.clear ()
+    get_samples (tone, true)
     synth.update_voices ()
     wave_panel.repaint ()
     spectrum_panel.repaint ()
   }
-  def generate_samples (f : Double, save : Boolean = false) : Array_float = {
+
+  def generate_samples (hc : Int, save : Boolean = false) : Array_float = {
     val s = new Array_float (frame_size)
-    val hc = harmonic_count (f).min (max_harmonic_count)
 
     def is_oct_div (f : Int, d : Int) : Boolean = {
       for (i <- 0 until 31) {
@@ -543,7 +584,24 @@ object Main extends SimpleSwingApplication {
       false
     }
 
-    spectrum_time = time {
+    spectrum_time = measure_time {
+      /*      for {
+              k <- 1 to 20
+              count = hc / k
+              i <- 1 to count
+              f = i * k
+            } {
+              val saw_a = 0
+              val saw_p = 2 / Math.PI * Math.sin (Math.PI * (i * (0.5 - pulse_width) - 0.5))
+              val a1 = saw_a * Math.pow (i, -osc_slope)
+              val a2 = saw_p * Math.pow (i, -osc_slope)
+              val gc = Math.pow (math.sinc_normalized (i.toDouble / (count + 1)), osc_sinc_exp)
+              val c = 1.0 // Math.pow (Math.abs (Math.cos (osc_cos_freq * i * 2 * Math.PI)), osc_cos_exp)
+              val gain = c * gc / Math.pow (k, 1.1) * filter_gain (f)
+
+              s (f * 2) += (gain * a1).toFloat
+              s (f * 2 + 1) += (gain * a2).toFloat
+            }*/
       for {
         i <- 1 to hc
 
@@ -569,7 +627,7 @@ object Main extends SimpleSwingApplication {
     if (save)
       s.copyToArray (spectrum)
 
-    fft_time = time (fft.realInverse (s, false))
+    fft_time = measure_time (fft.realInverse (s, false))
 
     if (prevent_clipping) {
       val max = osc_amp * Math.max (-s.min, s.max)
@@ -586,6 +644,7 @@ object Main extends SimpleSwingApplication {
       s.copyToArray (samples)
 
     update_info_label ()
+    samples_cache (hc) = s
     s
   }
 
@@ -629,11 +688,6 @@ object Main extends SimpleSwingApplication {
             ", spectrum time: " + spectrum_time / 1000 + " us, FFT time: " + fft_time / 1000 + " us" +
             (if (clip_amount > 0) ", clipped: " + clip_amount else "")
   }
-  def play_note (n : Int) = if (!notes_playing.contains (n)) {
-    val v = synth.play_tone (note_to_freq (n))
-    notes_playing (n) = v
-    keyboard_panel.repaint ()
-  }
 
   def top = frame
 
@@ -655,9 +709,28 @@ object Main extends SimpleSwingApplication {
             AudioSystem.write (new AudioInputStream (s, line.getFormat, synth.sampleSize), AudioFileFormat.Type.WAVE, chooser.selectedFile)*/
     }
   }
-  def note_to_freq (n : Int) = 440.0 * Math.pow (2, (n - 69) / 12.0)
-  def stop_playing_note (n : Int) : Boolean = notes_playing.get (n).exists { v =>
-    v.fade_out ()
+
+  def note_to_freq (n : Double) = 440.0 * Math.pow (2, (n - 69) / 12.0)
+
+  def play_note (n : Int) = if (!notes_playing.contains (n)) {
+    val nf = note_to_freq (n)
+
+    val voices = synth.play_tone (nf, 1) +: (if (unison_enabled) (for {
+      i <- 0 until unison_count * 2
+      dn = 2.0 * i / (unison_count * 2 - 1) - 1
+    } yield synth.play_tone (
+      nf * (1 + unison_range * dn),
+      unison_gain * (1 - Math.abs (dn) * unison_slope),
+      (i + 1) / (unison_count * 2 + 1))) else Seq ())
+
+    notes_playing (n) = voices
+    keyboard_panel.repaint ()
+  }
+
+  def stop_playing_note (n : Int) : Boolean = notes_playing.get (n).exists { voices =>
+    for (v <- voices)
+      v.fade_out ()
+
     notes_playing.remove (n)
     keyboard_panel.repaint ()
     true
@@ -690,7 +763,7 @@ object Main extends SimpleSwingApplication {
     false
   })
 
-  {
+  def register_midi_devices () : Unit = {
     import javax.sound.midi.{MidiSystem, MidiUnavailableException}
 
     for (info <- MidiSystem.getMidiDeviceInfo) {
@@ -726,7 +799,8 @@ object Main extends SimpleSwingApplication {
     }
   }
 
-  generate_samples (tone, true)
+  register_midi_devices ()
+  get_samples (tone, true)
   line.start ()
   fill_sound_buffer ()
   timer.start ()
