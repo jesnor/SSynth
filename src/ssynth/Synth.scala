@@ -1,6 +1,6 @@
 package ssynth
 
-import ssynth.util.utils.Array_float
+import scala_utils.utils.utils.Array_float
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -50,7 +50,10 @@ class Synth (samples_fn : Double => Array_float, val fade_time : Float = 0.001f)
         val t = (voice.time + frame_pos * voice.freq) * voice.samples.length
         val t1 = t.toInt
         val frac = t - t1
-        val s = (1 - frac) * voice.samples (t1 & (voice.samples.length - 1)) + frac * voice.samples ((t1 + 1) & (voice.samples.length - 1))
+
+        val s = (1 - frac) * voice.samples (t1 & (voice.samples.length - 1)) +
+            frac * voice.samples ((t1 + 1) & (voice.samples.length - 1))
+
         sum += voice.amp * voice.fade_amp * s
 
         if (voice.amp_k != 0)

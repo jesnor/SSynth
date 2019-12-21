@@ -7,9 +7,10 @@ import javax.sound.midi.{MidiMessage, Receiver}
 import javax.swing.filechooser.FileNameExtensionFilter
 import javax.swing.{SwingUtilities, Timer}
 import org.jtransforms.fft.FloatFFT_1D
+import scala_utils.audio.utils
 import scala_utils.swing.utils.{check_box, knob_with_labels, _}
 import scala_utils.math
-import ssynth.util.utils.Array_float
+import scala_utils.utils.utils.Array_float
 
 import scala.collection.mutable
 import scala.swing._
@@ -21,7 +22,7 @@ object Main extends SimpleSwingApplication {
   val sample_rate = 44100
   val nyquist_freq = sample_rate / 2.0
   val fft = new FloatFFT_1D (frame_size)
-  val line = audio.utils.open_line (sample_rate)
+  val line = utils.open_line (sample_rate)
 
   val buffer = new Array [Byte](line.getBufferSize)
   val sample_buffer = new Array [Float](line.getBufferSize)
@@ -34,6 +35,7 @@ object Main extends SimpleSwingApplication {
   var saw_square = 0.0
   var pulse_width = 0.5
   var max_harmonic_count = tone_harmonic_count
+  var max_harmonic_freq = nyquist_freq
   var keyboard_start = 48
   var osc_sinc_exp = 1.5
   var osc_slope = 1.0
@@ -77,7 +79,7 @@ object Main extends SimpleSwingApplication {
   val samples_cache = new mutable.HashMap [Int, Array_float]
 
   def get_samples (f : Double, save : Boolean = false) = {
-    val hc = harmonic_count (f).min (max_harmonic_count)
+    val hc = harmonic_count (f).min (max_harmonic_count).min ((max_harmonic_freq / f).toInt.max (1))
     samples_cache.getOrElse (hc, generate_samples (hc, save))
   }
 
@@ -324,6 +326,11 @@ object Main extends SimpleSwingApplication {
               max_harmonic_count = v.round.toInt
               update_synth ()
             }, 6),
+
+            knob_with_labels ("Max freq", 1000, nyquist_freq, max_harmonic_freq, v => {
+              max_harmonic_freq = v
+              update_synth ()
+            }),
 
             knob_with_labels ("Divider", 0, 100, osc_harmonics_divider / 2, v => {
               osc_harmonics_divider = (v * 2).round.toInt
