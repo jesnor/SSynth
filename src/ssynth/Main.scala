@@ -8,7 +8,7 @@ import javax.swing.filechooser.FileNameExtensionFilter
 import javax.swing.{SwingUtilities, Timer}
 import scala_utils.audio.utils
 import scala_utils.swing.utils._
-import scala_utils.utils.utils.Array_float
+import scala_utils.utils.Array_float
 import ssynth.swing.{Graph_panel, Keyboard_panel}
 
 import scala.collection.mutable
@@ -27,7 +27,7 @@ object Main extends SimpleSwingApplication {
 
   var display_tone = 55.0
 
-  val synth_module = new Synth_module (nyquist_freq)
+  val synth_module = new Synth_params (nyquist_freq)
   val synth = new Synth (synth_module, nyquist_freq)
 
   var clip_amount = 0
@@ -59,7 +59,7 @@ object Main extends SimpleSwingApplication {
   }
 
   val info_label = new Label
-  val synth_panel = swing.module_panel (synth_module, _ => update_synth ())
+  val synth_panel = swing.parameter_group_panel (synth_module)
   val keyboard_panel = new Keyboard_panel
   var spectrum : Array_float = _
 
@@ -213,15 +213,12 @@ object Main extends SimpleSwingApplication {
     update_info_label ()
   })
 
-  def update_synth () : Unit = {
-    synth.update ()
+  val synth_observer = synth.now_and_on_change {
     spectrum = synth.get_samples (display_tone)._1
     wave_panel.set_data (synth.get_samples (display_tone)._2)
     wave_panel.repaint ()
     spectrum_panel.repaint ()
   }
-
-  update_synth ()
 
   val chooser = new FileChooser
   chooser.fileFilter = new FileNameExtensionFilter ("WAV files", "wav")
@@ -306,6 +303,14 @@ object Main extends SimpleSwingApplication {
             case 8 =>
               val note = m.getMessage ()(1)
               SwingUtilities.invokeLater (() => stop_playing_note (note))
+
+            case 11 =>
+              val control = m.getMessage ()(1)
+              val value = m.getMessage ()(2)
+
+              SwingUtilities.invokeLater (() => control match {
+                case 21 => synth_module.filter_control.freq () = value / 127.0
+              })
 
             case _ =>
           }

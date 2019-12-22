@@ -2,13 +2,20 @@ package ssynth
 
 import org.jtransforms.fft.FloatFFT_1D
 import scala_utils.math
-import scala_utils.utils.utils.Array_float
+import scala_utils.utils.observables.CObservable
+import scala_utils.utils.Array_float
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-class Synth (model : Synth_module, max_freq : Double, val fade_time : Float = 0.001f) {
-  val max_voice_count = 32
+class Synth (model : Synth_params, max_freq : Double, val fade_time : Float = 0.001f) extends CObservable [Synth] {
+  val parameter_observer = model.add_observer (_ => {
+    samples_cache.clear ()
+    update_voices ()
+    fireChange (Synth.this)
+  })
+
+  val max_voice_count = 8
   val max_harmonics_count_shift = 9
   val max_harmonics_count = 1 << max_harmonics_count_shift
   val frame_size = 1 << (max_harmonics_count_shift + 2)
@@ -23,21 +30,21 @@ class Synth (model : Synth_module, max_freq : Double, val fade_time : Float = 0.
   def to_normalized_freq (f : Double) = scala.math.log (f) / math.log2 / max_harmonics_count_shift
 
   def filter_gain (freq : Double) = {
-    if (model.filter_control.enabled) {
+    if (model.filter_control.enabled ()) {
       val f0 = model.filter_control.freq ()
 
       val lf =
-        if (model.butterworth_lp_filter.enabled)
+        if (model.butterworth_lp_filter.enabled ())
           utils.state_variable_lpf_gain (freq / to_harmonic_freq (f0 + model.butterworth_lp_filter.freq ()), model.butterworth_lp_filter.q (),
             model.butterworth_lp_filter.order ())
         else 1.0
 
       val sf =
-        if (model.sinc_lp_filter.enabled)
+        if (model.sinc_lp_filter.enabled ())
           utils.sinc_filter_gain (Math.min (1, (freq - 1) / to_harmonic_freq (f0 + model.sinc_lp_filter.freq ())), model.sinc_lp_filter.order ())
         else 1.0
 
-      val rf = if (model.notch_filter.enabled)
+      val rf = if (model.notch_filter.enabled ())
         utils.calc_resonator_gain (
           freq / to_harmonic_freq (f0 + model.notch_filter.freq ()),
           model.notch_filter.gain (),
@@ -55,11 +62,6 @@ class Synth (model : Synth_module, max_freq : Double, val fade_time : Float = 0.
         .min ((model.harmonics.max_freq () / freq).toInt.max (1))
 
     samples_cache.getOrElse (hc, generate_samples (hc))
-  }
-
-  def update () = {
-    samples_cache.clear ()
-    update_voices ()
   }
 
   def generate_samples (hc : Int) : (Array_float, Array_float) = {
@@ -141,7 +143,7 @@ class Synth (model : Synth_module, max_freq : Double, val fade_time : Float = 0.
     val nf = note_to_freq (n)
 
     val unison_voices =
-      if (model.unison.enabled)
+      if (model.unison.enabled ())
         for {
           i <- 0 until model.unison.count () * 2
           dn = 2.0 * i / (model.unison.count () * 2 - 1) - 1
