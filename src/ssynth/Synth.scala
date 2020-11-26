@@ -47,13 +47,15 @@ class Synth (model : Synth_params, max_freq : Double, val fade_time : Float = 0.
 
       val lf =
         if (model.butterworth_lp_filter.enabled ())
-          utils.state_variable_lpf_gain (freq / to_harmonic_freq (f0 + model.butterworth_lp_filter.freq ()), model.butterworth_lp_filter.q (),
+          utils.state_variable_lpf_gain (freq / to_harmonic_freq (f0 + model.butterworth_lp_filter.freq ()),
+            model.butterworth_lp_filter.q (),
             model.butterworth_lp_filter.order ())
         else 1.0
 
       val sf =
         if (model.sinc_lp_filter.enabled ())
-          utils.sinc_filter_gain (Math.min (1, (freq - 1) / to_harmonic_freq (f0 + model.sinc_lp_filter.freq ())), model.sinc_lp_filter.order ())
+          utils.sinc_filter_gain (Math.min (1, (freq - 1) / to_harmonic_freq (f0 + model.sinc_lp_filter.freq ())),
+            model.sinc_lp_filter.order ())
         else 1.0
 
       val rf = if (model.notch_filter.enabled ())
