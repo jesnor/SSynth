@@ -198,6 +198,7 @@ object Main extends SimpleSwingApplication {
         add (titled_panel ("Keyboard", keyboard_panel), BorderPanel.Position.South)
       }
     )))
+
   def top = frame
 
   def update_info_label () = {
