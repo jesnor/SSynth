@@ -60,7 +60,7 @@ object Main extends SimpleSwingApplication {
 
   val info_label = new Label
   val synth_panel = swing.parameter_group_panel (synth_module)
-  val keyboard_panel = new Keyboard_panel
+  val keyboard_panel = new Keyboard_panel((note, playing) => if (playing) play_note(note) else stop_playing_note(note))
   var spectrum : Array_float = _
 
   val spectrum_panel = new Panel {
@@ -204,6 +204,7 @@ object Main extends SimpleSwingApplication {
   def update_info_label () = {
     info_label.text =
         "Voices: " + synth.voices.size +
+    synth.voices.headOption.map(", freq: " + _.freq.toInt.toString + " Hz").getOrElse("") +
             ", spectrum time: " + synth.spectrum_time / 1000 + " us, FFT time: " + synth.fft_time / 1000 + " us" +
             (if (clip_amount > 0) ", clipped: " + clip_amount else "")
   }
@@ -249,13 +250,13 @@ object Main extends SimpleSwingApplication {
     if (i == -1) None else Some (keyboard_start + i)
   }
 
-  def play_note (n : Int) = {
+  def play_note (n : Int): Unit = {
     synth.play_note (n)
     keyboard_panel.notes_playing = synth.notes_playing.keys.toSet
     keyboard_panel.repaint ()
   }
 
-  def stop_playing_note (n : Int) = {
+  def stop_playing_note (n : Int):Unit = {
     synth.stop_playing_note (n)
     keyboard_panel.notes_playing = synth.notes_playing.keys.toSet
     keyboard_panel.repaint ()

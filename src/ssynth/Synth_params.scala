@@ -5,8 +5,8 @@ import scala_utils.parameter.Parameter_group
 
 class Synth_params (max_freq : Double) extends Parameter_group ("FFT Synth") {
   object amp extends Parameter_group ("Amp") {
-    val gain = add_percent_param ("Gain", 1)
-    val clipping = add_boolean_param ("Clipping")
+    val gain = add_percent_param ("Gain", 1, Range(0, 2.0))
+    //val clipping = add_boolean_param ("Clipping")
   }
 
   object harmonics extends Parameter_group ("Harmonics") {
@@ -16,6 +16,7 @@ class Synth_params (max_freq : Double) extends Parameter_group ("FFT Synth") {
     val max_freq = add_param ("Max freq", Synth_params.this.max_freq, Range (0, Synth_params.this.max_freq))
     val divider = add_param ("Divider", 0, Range (0, 100))
     val slope = add_percent_param ("Slope", 1, Range (0, 2.0))
+    val bass_boost = add_percent_param ("Bass boost", 1, Range (0, 2.0))
     val sinc_exp = add_param ("Gibbs exp", 1.5, Range (0, 3.0))
     val cos_freq = add_percent_param ("Cos freq", 0)
     val cos_exp = add_param ("Cos exp", 1.0, Range (0.0, 10.0))

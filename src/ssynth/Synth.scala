@@ -15,7 +15,7 @@ class Synth (model : Synth_params, max_freq : Double, val fade_time : Float = 0.
     fireChange (Synth.this)
   })
 
-  val max_voice_count = 8
+  val max_voice_count = 1
   val max_harmonics_count_shift = 9
   val max_harmonics_count = 1 << max_harmonics_count_shift
   val frame_size = 1 << (max_harmonics_count_shift + 2)
@@ -29,19 +29,33 @@ class Synth (model : Synth_params, max_freq : Double, val fade_time : Float = 0.
   def to_harmonic_freq (f : Double) = scala.math.pow (2, max_harmonics_count_shift * f)
   def to_normalized_freq (f : Double) = scala.math.log (f) / math.log2 / max_harmonics_count_shift
 
+  /**
+   * Compensation for equal-loudness
+   *
+   * From 500 Hz is perceived as approximately 20-40 times louder than 40 Hz at 60 - 80 dB SPL
+   *
+   * @param base_freq
+   * @param freq
+   * @return
+   */
+  def bass_boost (base_freq: Double, freq: Double) =
+     1.0 / (1 + model.harmonics.bass_boost() * 10 * (freq.max(40).min(500) - 40) / (500 - 40))
+
   def filter_gain (freq : Double) = {
     if (model.filter_control.enabled ()) {
       val f0 = model.filter_control.freq ()
 
       val lf =
         if (model.butterworth_lp_filter.enabled ())
-          utils.state_variable_lpf_gain (freq / to_harmonic_freq (f0 + model.butterworth_lp_filter.freq ()), model.butterworth_lp_filter.q (),
+          utils.state_variable_lpf_gain (freq / to_harmonic_freq (f0 + model.butterworth_lp_filter.freq ()),
+            model.butterworth_lp_filter.q (),
             model.butterworth_lp_filter.order ())
         else 1.0
 
       val sf =
         if (model.sinc_lp_filter.enabled ())
-          utils.sinc_filter_gain (Math.min (1, (freq - 1) / to_harmonic_freq (f0 + model.sinc_lp_filter.freq ())), model.sinc_lp_filter.order ())
+          utils.sinc_filter_gain (Math.min (1, (freq - 1) / to_harmonic_freq (f0 + model.sinc_lp_filter.freq ())),
+            model.sinc_lp_filter.order ())
         else 1.0
 
       val rf = if (model.notch_filter.enabled ())
@@ -61,10 +75,10 @@ class Synth (model : Synth_params, max_freq : Double, val fade_time : Float = 0.
         .min (model.harmonics.count ())
         .min ((model.harmonics.max_freq () / freq).toInt.max (1))
 
-    samples_cache.getOrElse (hc, generate_samples (hc))
+    samples_cache.getOrElse (hc, generate_samples (freq, hc))
   }
 
-  def generate_samples (hc : Int) : (Array_float, Array_float) = {
+  def generate_samples (freq: Double, hc : Int) : (Array_float, Array_float) = {
     val spectrum = new Array_float (frame_size)
 
     def is_oct_div (f : Int, d : Int) : Boolean = {
@@ -114,7 +128,9 @@ class Synth (model : Synth_params, max_freq : Double, val fade_time : Float = 0.
         val a2 = math.interpolate (model.harmonics.saw_square (), saw_p, square_p) * Math.pow (i, -model.harmonics.slope ())
         val gc = Math.pow (math.sinc_normalized (i.toDouble / (hc + 1)), model.harmonics.sinc_exp ())
         val c = Math.pow (Math.abs (Math.cos (model.harmonics.cos_freq () * i * 2 * Math.PI)), model.harmonics.cos_exp ())
-        val gain = c * gc * filter_gain (i)
+        val fg = filter_gain(i)
+        val bb = bass_boost(freq, freq * i)
+        val gain = c * gc * fg * bb
 
         spectrum (i * 2) = (gain * a1).toFloat
         spectrum (i * 2 + 1) = (gain * a2).toFloat
@@ -123,15 +139,14 @@ class Synth (model : Synth_params, max_freq : Double, val fade_time : Float = 0.
 
     val samples = spectrum.clone ()
     fft_time = utils.measure_nanos (fft.realInverse (samples, false))
+    val max = Math.max (-samples.min, samples.max)
+    var gain = model.amp.gain () / max_voice_count
 
-    val scale = (model.amp.gain () / max_voice_count * (
-        if (model.amp.clipping ()) 1.0 else {
-          val max = Math.max (-samples.min, samples.max)
-          if (max > 2.0) 2.0 / max else 1.0
-        })).toFloat
+    if (gain * max > 2.0)
+      gain = 2.0 / max
 
     for (i <- samples.indices)
-      samples (i) *= scale
+      samples (i) *= gain.toFloat
 
     samples_cache (hc) = (spectrum, samples)
     (spectrum, samples)
